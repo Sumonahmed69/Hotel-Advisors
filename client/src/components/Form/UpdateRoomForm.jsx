@@ -18,7 +18,7 @@ const UpdateRoomForm = ({
               Location
             </label>
             <input
-              className='w-full px-4 py-3 text-gray-800 border border-rose-300 focus:outline-rose-500 rounded-md '
+              className='w-full px-4 py-3 text-gray-800 border  border-[#00cc9c]  focus:outline-[#00af87] rounded-md '
               name='location'
               id='location'
               type='text'
@@ -35,7 +35,7 @@ const UpdateRoomForm = ({
               Title
             </label>
             <input
-              className='w-full px-4 py-3 text-gray-800 border border-rose-300 focus:outline-rose-500 rounded-md '
+              className='w-full px-4 py-3 text-gray-800 border border-[#00cc9c]  focus:outline-[#00af87] rounded-md '
               name='title'
               id='title'
               type='text'
@@ -58,7 +58,7 @@ const UpdateRoomForm = ({
               onChange={e =>
                 setRoomData({ ...roomData, category: e.target.value })
               }
-              className='w-full px-4 py-3 border-rose-300 focus:outline-rose-500 rounded-md'
+              className='w-full px-4 py-3 border-[#00cc9c]  focus:outline-[#00af87] rounded-md'
               name='category'
             >
               {categories.map(category => (
@@ -76,11 +76,12 @@ const UpdateRoomForm = ({
             <div className='flex justify-center pt-2'>
               {/* Calender */}
               <DateRange
-                rangeColors={['#F43F5E']}
+                rangeColors={['#128c7e ']}
                 editableDateInputs={true}
                 onChange={item => handleDates(item)}
                 moveRangeOnFirstSelection={false}
                 ranges={[dates]}
+                minDate={(new Date())}
               />
             </div>
           </div>
@@ -98,7 +99,7 @@ const UpdateRoomForm = ({
                     accept='image/*'
                     hidden
                   />
-                  <div className='bg-rose-500 text-white border border-gray-300 rounded font-semibold cursor-pointer p-1 px-3 hover:bg-rose-500'>
+                  <div className='bg-[#00cc9c] text-white border border-gray-300 rounded font-semibold cursor-pointer p-1 px-3 hover:bg-rose-500'>
                     Upload Image
                   </div>
                 </label>
@@ -111,7 +112,7 @@ const UpdateRoomForm = ({
                 Price
               </label>
               <input
-                className='w-full px-4 py-3 text-gray-800 border border-rose-300 focus:outline-rose-500 rounded-md '
+                className='w-full px-4 py-3 text-gray-800 border border-[#00cc9c]  focus:outline-[#00af87] rounded-md '
                 name='price'
                 id='price'
                 value={roomData?.price}
@@ -129,7 +130,7 @@ const UpdateRoomForm = ({
                 Total guest
               </label>
               <input
-                className='w-full px-4 py-3 text-gray-800 border border-rose-300 focus:outline-rose-500 rounded-md '
+                className='w-full px-4 py-3 text-gray-800 border border-[#00cc9c]  focus:outline-[#00af87] rounded-md '
                 name='total_guest'
                 id='guest'
                 value={roomData?.guests}
@@ -149,7 +150,7 @@ const UpdateRoomForm = ({
                 Bedrooms
               </label>
               <input
-                className='w-full px-4 py-3 text-gray-800 border border-rose-300 focus:outline-rose-500 rounded-md '
+                className='w-full px-4 py-3 text-gray-800 border border-[#00cc9c]  focus:outline-[#00af87] rounded-md '
                 name='bedrooms'
                 id='bedrooms'
                 value={roomData?.bedrooms}
@@ -167,7 +168,7 @@ const UpdateRoomForm = ({
                 Bathrooms
               </label>
               <input
-                className='w-full px-4 py-3 text-gray-800 border border-rose-300 focus:outline-rose-500 rounded-md '
+                className='w-full px-4 py-3 text-gray-800 border border-[#00cc9c]  focus:outline-[#00af87] rounded-md '
                 name='bathrooms'
                 id='bathrooms'
                 value={roomData?.bathrooms}
@@ -192,7 +193,7 @@ const UpdateRoomForm = ({
               onChange={e =>
                 setRoomData({ ...roomData, description: e.target.value })
               }
-              className='block rounded-md focus:rose-300 w-full h-32 px-4 py-3 text-gray-800  border border-rose-300 focus:outline-rose-500 '
+              className='block rounded-md focus:rose-300 w-full h-32 px-4 py-3 text-gray-800  border border-[#00cc9c]  focus:outline-[#00af87] '
               name='description'
             ></textarea>
           </div>
@@ -200,7 +201,7 @@ const UpdateRoomForm = ({
 
         <button
           type='submit'
-          className='w-full p-3 mt-5 text-center font-medium text-white transition duration-200 rounded shadow-md bg-rose-500'
+          className='w-full p-3 mt-5 text-center font-medium text-white transition duration-200 rounded shadow-md bg-[#00cc9c]'
         >
           Update
         </button>

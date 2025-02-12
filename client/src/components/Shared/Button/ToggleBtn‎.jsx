@@ -13,10 +13,10 @@ const ToggleBtn = ({ toggleHandler, toggle }) => {
           className='hidden peer'
           checked={toggle}
         />
-        <span className='px-4 py-1 rounded-l-md bg-rose-400 peer-checked:bg-gray-300'>
+        <span className='px-4 py-1 rounded-l-md bg-[#01ca9b] peer-checked:bg-gray-200'>
           Guest
         </span>
-        <span className='px-4 py-1 rounded-r-md bg-gray-300 peer-checked:bg-rose-400'>
+        <span className='px-4 py-1 rounded-r-md bg-gray-200 peer-checked:bg-[#01ca9b]'>
           Host
         </span>
       </label>

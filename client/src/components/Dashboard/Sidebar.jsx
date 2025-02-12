@@ -37,7 +37,7 @@ const Sidebar = () => {
             <Link to="/">
               <img
                 // className='hidden md:block'
-                src="https://i.ibb.co/4ZXzmq5/logo.png"
+                src="https://i.ibb.co.com/cKMGxjxN/0235fe91-9a5b-496d-b9f6-eb0a321c1558.jpg"
                 alt="logo"
                 width="100"
                 height="100"
@@ -62,13 +62,13 @@ const Sidebar = () => {
       >
         <div>
           <div>
-            <div className="w-full hidden md:flex px-4 py-2 shadow-lg rounded-lg justify-center items-center bg-rose-100 mx-auto">
+            <div className="w-full hidden md:flex px-4 py-2 shadow-lg rounded-lg justify-center items-center  mx-auto">
               <Link to="/">
                 <img
                   // className='hidden md:block'
-                  src="https://i.ibb.co/4ZXzmq5/logo.png"
+                  src="https://i.ibb.co.com/cKMGxjxN/0235fe91-9a5b-496d-b9f6-eb0a321c1558.jpg"
                   alt="logo"
-                  width="100"
+                  width="180"
                   height="100"
                 />
               </Link>
