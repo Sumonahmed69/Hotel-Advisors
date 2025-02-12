@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 const ErrorPage = () => {
   const navigate = useNavigate()
 
+
+  
   return (
     <section className='bg-white '>
       <div className='container flex items-center min-h-screen px-6 py-12 mx-auto'>

@@ -3,10 +3,12 @@ const app = express()
 require('dotenv').config()
 const cors = require('cors')
 const cookieParser = require('cookie-parser')
+const nodemailer = require("nodemailer");
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 const jwt = require('jsonwebtoken')
-
-const port = process.env.PORT || 8000
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
+const port = process.env.PORT || 5000
+//tqsd kdvy qals tpds
 
 // middleware
 const corsOptions = {
@@ -19,10 +21,54 @@ app.use(cors(corsOptions))
 app.use(express.json())
 app.use(cookieParser())
 
+
+
+
+
+
+
+// send email
+const sendEmail = (emailAddress, emailData) => {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // Use `true` for port 465, `false` for all other ports
+    auth: {
+      user: process.env.TRANSPORTER_EMAIL,
+      pass: process.env.TRANSPORTER_PASS,
+    },
+  })
+
+  // verify transporter
+  // verify connection configuration
+  transporter.verify(function (error, success) {
+    if (error) {
+      console.log(error)
+    } else {
+      console.log('Server is ready to take our messages')
+    }
+  })
+  const mailBody = {
+    from: `"HotelAdvisor" <${process.env.TRANSPORTER_EMAIL}>`, // sender address
+    to: emailAddress, // list of receivers
+    subject: emailData.subject, // Subject line
+    html: emailData.message, // html body
+  }
+
+  transporter.sendMail(mailBody, (error, info) => {
+    if (error) {
+      console.log(error)
+    } else {
+      console.log('Email Sent: ' + info.response)
+    }
+  })
+}
+
 // Verify Token Middleware
 const verifyToken = async (req, res, next) => {
   const token = req.cookies?.token
-  console.log(token)
+  // console.log(token)
   if (!token) {
     return res.status(401).send({ message: 'unauthorized access' })
   }
@@ -36,7 +82,8 @@ const verifyToken = async (req, res, next) => {
   })
 }
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@main.mq0mae1.mongodb.net/?retryWrites=true&w=majority&appName=Main`
+
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.hae9l.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -47,6 +94,39 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
+    const db = client.db('hotelAdvisor')
+    const roomsCollection = db.collection('rooms')
+    const usersCollection = db.collection('users')
+    const bookingsCollection = db.collection('bookings')
+
+    // verify admin middleware
+    const verifyAdmin = async (req, res, next) => {
+      // console.log('hello')
+      const user = req.user
+      const query = { email: user?.email }
+      const result = await usersCollection.findOne(query)
+      console.log(result?.role)
+      if (!result || result?.role !== 'admin')
+        return res.status(401).send({ message: 'unauthorized access!!' })
+
+      next()
+    }
+
+
+    // verify host middleware
+    const verifyHost = async (req, res, next) => {
+      // console.log('hello')
+      const user = req.user
+      const query = { email: user?.email }
+      const result = await usersCollection.findOne(query)
+      console.log(result?.role)
+      if (!result || result?.role !== 'host') {
+        return res.status(401).send({ message: 'unauthorized access!!' })
+      }
+      next()
+    }
+
+
     // auth related api
     app.post('/jwt', async (req, res) => {
       const user = req.body
@@ -61,6 +141,28 @@ async function run() {
         })
         .send({ success: true })
     })
+
+
+
+    // create-payment-intent
+    app.post('/create-payment-intent', verifyToken, async (req, res) => {
+      const price = req.body.price
+      const priceInCent = parseFloat(price) * 100
+      if (!price || priceInCent < 1) return
+      // generate clientSecret
+      const { client_secret } = await stripe.paymentIntents.create({
+        amount: priceInCent,
+        currency: 'usd',
+        // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      })
+      // send client secret as response
+      res.send({ clientSecret: client_secret })
+    })
+
+
     // Logout
     app.get('/logout', async (req, res) => {
       try {
@@ -77,6 +179,335 @@ async function run() {
       }
     })
 
+
+    // save a user data in db
+    app.put('/user', async (req, res) => {
+      const user = req.body
+      const query = { email: user?.email }
+      // check if user already exists in db
+      const isExist = await usersCollection.findOne(query)
+      if (isExist) {
+        if (user.status === 'Requested') {
+          // if existing user try to change his role
+          const result = await usersCollection.updateOne(query, {
+            $set: { status: user?.status },
+          })
+          return res.send(result)
+        } else {
+          // if existing user login again
+          return res.send(isExist)
+        }
+      }
+
+      // save user for the first time
+      const options = { upsert: true }
+      const updateDoc = {
+        $set: {
+          ...user,
+          timestamp: Date.now(),
+        },
+      }
+      const result = await usersCollection.updateOne(query, updateDoc, options)
+      // welcome new user
+      sendEmail(user?.email, {
+        subject: 'Welcome to HotelAdvisor!',
+        message: `Hope you will find you destination`,
+      })
+     
+     
+      res.send(result)
+    })
+
+
+
+    // get a user info by email from db
+    app.get('/user/:email', async (req, res) => {
+      const email = req.params.email
+      const result = await usersCollection.findOne({ email })
+      res.send(result)
+    })
+
+
+    // get all users data from db
+    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+      const result = await usersCollection.find().toArray()
+      res.send(result)
+    })
+
+
+    //update a user role
+    app.patch('/users/update/:email', async (req, res) => {
+      const email = req.params.email
+      const user = req.body
+      const query = { email }
+      const updateDoc = {
+        $set: { ...user, timestamp: Date.now() },
+      }
+      const result = await usersCollection.updateOne(query, updateDoc)
+      res.send(result)
+    })
+
+
+    //get all rooms data form db
+    app.get('/rooms', async (req, res) => {
+      const category = req.query.category
+      let query = {}
+      if (category && category !== 'null') query = { category }
+      const result = await roomsCollection.find(query).toArray()
+      res.send(result)
+    })
+
+
+    // Save a room data in db
+    app.post('/room', verifyToken, verifyHost, async (req, res) => {
+      const roomData = req.body
+      const result = await roomsCollection.insertOne(roomData)
+      res.send(result)
+    })
+
+    //get A single data by id form db 
+    app.get('/room/:id', async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await roomsCollection.findOne(query)
+      res.send(result)
+    })
+
+
+    // delete a room
+    app.delete('/room/:id', verifyToken, verifyHost, async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await roomsCollection.deleteOne(query)
+      res.send(result)
+    })
+
+    // update room data
+    app.put('/room/update/:id', verifyToken, verifyHost, async (req, res) => {
+      const id = req.params.id
+      const roomData = req.body
+      const query = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: roomData,
+      }
+      const result = await roomsCollection.updateOne(query, updateDoc)
+      res.send(result)
+    })
+
+
+    // Save a booking data in db
+    app.post('/booking', verifyToken, async (req, res) => {
+      const bookingData = req.body
+      // save room booking info
+      const result = await bookingsCollection.insertOne(bookingData)
+
+
+  // send email to guest
+  sendEmail(bookingData?.guest?.email, {
+    subject: 'Booking Successful!',
+    message: `You've successfully booked a room through HotelAdvisor. Transaction Id: ${bookingData.transactionId}`,
+  })
+  // send email to host
+  sendEmail(bookingData?.host?.email, {
+    subject: 'Your room got booked!',
+    message: `Get ready to welcome ${bookingData.guest.name}.`,
+  })
+
+
+
+
+
+
+
+
+
+
+      res.send(result)
+    })
+
+    // delete a booking
+    app.delete('/booking/:id', verifyToken, async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await bookingsCollection.deleteOne(query)
+      res.send(result)
+    })
+
+
+    // update Room Status
+    app.patch('/room/status/:id', async (req, res) => {
+      const id = req.params.id
+      const status = req.body.status
+      // change room availability status
+      const query = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: { booked: status },
+      }
+      const result = await roomsCollection.updateOne(query, updateDoc)
+      res.send(result)
+    })
+
+
+    // get all rooms for host
+    app.get('/my-listings/:email',
+      verifyToken,
+      verifyHost,
+      async (req, res) => {
+        const email = req.params.email
+
+        let query = { 'host.email': email }
+        const result = await roomsCollection.find(query).toArray()
+        res.send(result)
+      })
+
+    // get all booking for a guest
+    app.get('/my-bookings/:email', verifyToken, async (req, res) => {
+      const email = req.params.email
+      const query = { 'guest.email': email }
+      const result = await bookingsCollection.find(query).toArray()
+      res.send(result)
+    })
+
+
+    // get all booking for a host
+    app.get(
+      '/manage-bookings/:email',
+      verifyToken,
+      verifyHost,
+      async (req, res) => {
+        const email = req.params.email
+        const query = { 'host.email': email }
+        const result = await bookingsCollection.find(query).toArray()
+        res.send(result)
+      })
+
+
+    // Admin Statistics
+    app.get('/admin-stat', verifyToken, verifyAdmin, async (req, res) => {
+
+      const bookingDetails = await bookingsCollection
+        .find(
+          {},
+          {
+            projection: {
+              date: 1,
+              price: 1,
+            },
+          }
+        )
+        .toArray()
+      const totalUsers = await usersCollection.countDocuments()
+      const totalRooms = await roomsCollection.countDocuments()
+      const totalPrice = bookingDetails.reduce(
+        (sum, booking) => sum + booking.price,
+        0
+      )
+
+      const chartData = bookingDetails.map(booking => {
+        const day = new Date(booking.date).getDate()
+        const month = new Date(booking.date).getMonth() + 1
+        const data = [`${day}/${month}`, booking?.price]
+        return data
+      })
+      chartData.unshift(['Day', 'Sales'])
+      // chartData.splice(0, 0, ['Day', 'Sales'])
+
+      res.send({
+        chartData,
+        totalUsers,
+        totalRooms,
+        totalPrice,
+        totalBookings: bookingDetails.length,
+      })
+
+    })
+
+
+    // Host Statistics
+    app.get('/host-stat', verifyToken, verifyHost, async (req, res) => {
+      const { email } = req.user
+      const bookingDetails = await bookingsCollection
+        .find(
+          { 'host.email': email },
+          {
+            projection: {
+              date: 1,
+              price: 1,
+            },
+          }
+        )
+        .toArray()
+
+      const totalRooms = await roomsCollection.countDocuments({
+        'host.email': email,
+      })
+      const totalPrice = bookingDetails.reduce(
+        (sum, booking) => sum + booking.price,
+        0
+      )
+      const { timestamp } = await usersCollection.findOne(
+        { email },
+        { projection: { timestamp: 1 } }
+      )
+
+      const chartData = bookingDetails.map(booking => {
+        const day = new Date(booking.date).getDate()
+        const month = new Date(booking.date).getMonth() + 1
+        const data = [`${day}/${month}`, booking?.price]
+        return data
+      })
+      chartData.unshift(['Day', 'Sales'])
+
+      res.send({
+        totalRooms,
+        totalBookings: bookingDetails.length,
+        totalPrice,
+        chartData,
+        hostSince: timestamp,
+      })
+    })
+
+    // Guest Statistics
+    app.get('/guest-stat', verifyToken, async (req, res) => {
+      const { email } = req.user
+      const bookingDetails = await bookingsCollection
+        .find(
+          { 'guest.email': email },
+          {
+            projection: {
+              date: 1,
+              price: 1,
+            },
+          }
+        )
+        .toArray()
+
+      const totalPrice = bookingDetails.reduce(
+        (sum, booking) => sum + booking.price,
+        0
+      )
+      const { timestamp } = await usersCollection.findOne(
+        { email },
+        { projection: { timestamp: 1 } }
+      )
+
+      const chartData = bookingDetails.map(booking => {
+        const day = new Date(booking.date).getDate()
+        const month = new Date(booking.date).getMonth() + 1
+        const data = [`${day}/${month}`, booking?.price]
+        return data
+      })
+      chartData.unshift(['Day', 'Sales'])
+
+      res.send({
+        totalBookings: bookingDetails.length,
+        totalPrice,
+        chartData,
+        guestSince: timestamp,
+      })
+    })
+
+
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 })
     console.log(
@@ -89,9 +520,9 @@ async function run() {
 run().catch(console.dir)
 
 app.get('/', (req, res) => {
-  res.send('Hello from StayVista Server..')
+  res.send('Hello from  Server..')
 })
-
-app.listen(port, () => {
-  console.log(`StayVista is running on port ${port}`)
-})
+app.listen
+  (port, () => {
+    console.log(`Server is running on port ${port}`)
+  })
