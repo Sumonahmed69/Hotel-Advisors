@@ -8,7 +8,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 const jwt = require('jsonwebtoken')
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port = process.env.PORT || 5000
-//tqsd kdvy qals tpds
+
 
 // middleware
 const corsOptions = {
@@ -20,10 +20,6 @@ app.use(cors(corsOptions))
 
 app.use(express.json())
 app.use(cookieParser())
-
-
-
-
 
 
 
@@ -65,22 +61,28 @@ const sendEmail = (emailAddress, emailData) => {
   })
 }
 
+
+
+
 // Verify Token Middleware
 const verifyToken = async (req, res, next) => {
-  const token = req.cookies?.token
-  // console.log(token)
-  if (!token) {
-    return res.status(401).send({ message: 'unauthorized access' })
-  }
-  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-    if (err) {
-      console.log(err)
-      return res.status(401).send({ message: 'unauthorized access' })
+  try {
+    const token = req.cookies?.token;
+    if (!token) {
+      return res.status(401).json({ message: 'Unauthorized: No token provided' });
     }
-    req.user = decoded
-    next()
-  })
-}
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    console.error('JWT Verification Error:', err.message);
+
+    return res.status(401).json({
+      message: 'Unauthorized: Invalid or expired token',
+      error: err.message
+    });
+  }
+};
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.hae9l.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`
@@ -99,48 +101,78 @@ async function run() {
     const usersCollection = db.collection('users')
     const bookingsCollection = db.collection('bookings')
 
+
+
+
     // verify admin middleware
     const verifyAdmin = async (req, res, next) => {
-      // console.log('hello')
-      const user = req.user
-      const query = { email: user?.email }
-      const result = await usersCollection.findOne(query)
-      console.log(result?.role)
-      if (!result || result?.role !== 'admin')
-        return res.status(401).send({ message: 'unauthorized access!!' })
+      try {
+        const user = req.user;
+        if (!user || !user.email) {
+          return res.status(401).send({ message: 'Unauthorized: User information missing' });
+        }
+        const query = { email: user.email };
+        const result = await usersCollection.findOne(query);
+        console.log(result?.role);
 
-      next()
-    }
+        if (!result || result?.role !== 'admin') {
+          return res.status(401).send({ message: 'Unauthorized access!!' });
+        }
+
+        next();
+      } catch (err) {
+        console.error('Error in verifyAdmin middleware:', err);
+        res.status(500).send({ message: 'Internal server error' });
+      }
+    };
+
+
 
 
     // verify host middleware
     const verifyHost = async (req, res, next) => {
-      // console.log('hello')
-      const user = req.user
-      const query = { email: user?.email }
-      const result = await usersCollection.findOne(query)
-      console.log(result?.role)
-      if (!result || result?.role !== 'host') {
-        return res.status(401).send({ message: 'unauthorized access!!' })
+      try {
+        const user = req.user;
+        if (!user || !user.email) {
+          return res.status(401).send({ message: 'Unauthorized: User information missing' });
+        }
+        const query = { email: user.email };
+        const result = await usersCollection.findOne(query);
+        console.log(result?.role);
+        if (!result || result?.role !== 'host') {
+          return res.status(401).send({ message: 'Unauthorized access!!' });
+        }
+        next();
+      } catch (err) {
+        console.error('Error in verifyHost middleware:', err);
+        res.status(500).send({ message: 'Internal server error' });
       }
-      next()
-    }
+    };
+
 
 
     // auth related api
     app.post('/jwt', async (req, res) => {
-      const user = req.body
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: '365d',
-      })
-      res
-        .cookie('token', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-        })
-        .send({ success: true })
-    })
+      try {
+        const user = req.body;
+        if (!user) {
+          return res.status(400).send({ success: false, message: 'User data is required' });
+        }
+        const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+          expiresIn: '365d',
+        });
+        res
+          .cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+          })
+          .send({ success: true });
+      } catch (error) {
+        console.error('Error in /jwt route:', error);
+        res.status(500).send({ success: false, message: 'Internal Server Error' });
+      }
+    });
 
 
 
@@ -175,7 +207,8 @@ async function run() {
           .send({ success: true })
         console.log('Logout successful')
       } catch (err) {
-        res.status(500).send(err)
+        console.error('Error during logout:', err);
+        res.status(500).send({ success: false, message: 'Internal server error during logout' });
       }
     })
 
@@ -213,8 +246,8 @@ async function run() {
         subject: 'Welcome to HotelAdvisor!',
         message: `Hope you will find you destination`,
       })
-     
-     
+
+
       res.send(result)
     })
 
@@ -302,25 +335,16 @@ async function run() {
       const result = await bookingsCollection.insertOne(bookingData)
 
 
-  // send email to guest
-  sendEmail(bookingData?.guest?.email, {
-    subject: 'Booking Successful!',
-    message: `You've successfully booked a room through HotelAdvisor. Transaction Id: ${bookingData.transactionId}`,
-  })
-  // send email to host
-  sendEmail(bookingData?.host?.email, {
-    subject: 'Your room got booked!',
-    message: `Get ready to welcome ${bookingData.guest.name}.`,
-  })
-
-
-
-
-
-
-
-
-
+      // send email to guest
+      sendEmail(bookingData?.guest?.email, {
+        subject: 'Booking Successful!',
+        message: `You've successfully booked a room through HotelAdvisor. Transaction Id: ${bookingData.transactionId}`,
+      })
+      // send email to host
+      sendEmail(bookingData?.host?.email, {
+        subject: 'Your room got booked!',
+        message: `Get ready to welcome ${bookingData.guest.name}.`,
+      })
 
       res.send(result)
     })
